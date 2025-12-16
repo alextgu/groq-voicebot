@@ -5,7 +5,10 @@ import io
 import math
 import struct
 import pyaudio
+from dotenv import load_dotenv
 from groq import Groq
+
+load_dotenv()
 
 # ----------------------
 CHUNK = 1024
@@ -128,9 +131,6 @@ class Ear:
             pass
 
 if __name__ == "__main__":
-    from dotenv import load_dotenv
-    load_dotenv()
-    
     ear = Ear()
     # Loop to test continuous listening
     while True:
