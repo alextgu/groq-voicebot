@@ -108,7 +108,7 @@ class Ear:
         try:
             transcription = client.audio.transcriptions.create(
                 file=buffer,
-                model="distil-whisper-large-v3-en",
+                model="whisper-large-v3-turbo",
                 response_format="json",
                 language="en",
                 temperature=0.0
@@ -135,6 +135,6 @@ if __name__ == "__main__":
     # Loop to test continuous listening
     while True:
         try:
-            ear.listen()
+            text = ear.listen()
         except KeyboardInterrupt:
             break
