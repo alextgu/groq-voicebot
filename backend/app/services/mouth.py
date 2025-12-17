@@ -13,9 +13,8 @@ class Mouth:
 
         # 2. Configuration
         # You can grab other IDs from https://api.elevenlabs.io/v1/voices
-        self.voice_id = "21m00Tcm4TlvDq8ikWAM" # British Man Brian
+        self.voice_id = "21m00Tcm4TlvDq8ikWAM" 
         
-        # CRITICAL: Use "turbo" model for <400ms latency
         self.model_id = "eleven_turbo_v2_5"
 
     def speak(self, text: str):
