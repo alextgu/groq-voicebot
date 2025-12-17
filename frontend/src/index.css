@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/* Animated liquid background - purple/red water effect */
+.animated-bg {
+  position: fixed;
+  inset: 0;
+  background: #0a0a0f;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.animated-bg::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: 
+    radial-gradient(ellipse 80% 50% at 20% 40%, rgba(139, 69, 150, 0.5) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 80% at 80% 20%, rgba(255, 107, 107, 0.4) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 60% at 40% 80%, rgba(180, 60, 120, 0.5) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 70% at 70% 60%, rgba(100, 40, 140, 0.4) 0%, transparent 50%),
+    radial-gradient(ellipse 90% 40% at 30% 20%, rgba(200, 80, 100, 0.3) 0%, transparent 50%);
+  animation: liquidFlow 15s ease-in-out infinite;
+  filter: blur(60px);
+}
+
+.animated-bg::after {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background: 
+    radial-gradient(ellipse 50% 60% at 60% 30%, rgba(255, 100, 130, 0.35) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 50% at 20% 70%, rgba(120, 50, 160, 0.4) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 70% at 85% 80%, rgba(200, 70, 100, 0.35) 0%, transparent 50%),
+    radial-gradient(ellipse 80% 40% at 10% 40%, rgba(150, 60, 140, 0.3) 0%, transparent 50%);
+  animation: liquidFlow 20s ease-in-out infinite reverse;
+  filter: blur(80px);
+}
+
+@keyframes liquidFlow {
+  0%, 100% {
+    transform: translate(0%, 0%) rotate(0deg) scale(1);
+  }
+  25% {
+    transform: translate(5%, -5%) rotate(5deg) scale(1.05);
+  }
+  50% {
+    transform: translate(-3%, 5%) rotate(-3deg) scale(0.98);
+  }
+  75% {
+    transform: translate(-5%, -3%) rotate(3deg) scale(1.02);
+  }
+}
+
+/* Additional floating orbs for more depth */
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.5;
+  animation: orbFloat 25s ease-in-out infinite;
+}
+
+.bg-orb-1 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(255, 107, 107, 0.6) 0%, transparent 70%);
+  top: -10%;
+  left: -10%;
+  animation-delay: 0s;
+}
+
+.bg-orb-2 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(160, 60, 180, 0.5) 0%, transparent 70%);
+  bottom: -5%;
+  right: -5%;
+  animation-delay: -8s;
+}
+
+.bg-orb-3 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(200, 80, 120, 0.4) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation-delay: -15s;
+}
+
+@keyframes orbFloat {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  20% {
+    transform: translate(80px, -60px) scale(1.1);
+  }
+  40% {
+    transform: translate(-40px, 80px) scale(0.9);
+  }
+  60% {
+    transform: translate(60px, 40px) scale(1.05);
+  }
+  80% {
+    transform: translate(-60px, -40px) scale(0.95);
+  }
+}
+
+/* Gradient text animation */
+@keyframes gradientFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradientFlow {
+  animation: gradientFlow 3s ease infinite;
+}
+
+/* Floating logo animation */
+.floating-logo {
+  animation: floatLogo 3s ease-in-out infinite;
+}
+
+@keyframes floatLogo {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Base styles */
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
