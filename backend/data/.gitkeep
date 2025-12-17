@@ -1,0 +1,4 @@
+# This directory stores:
+# - pdfs/       : Place your course PDFs here for ingestion
+# - chroma_db/  : ChromaDB vector database (auto-created)
+
