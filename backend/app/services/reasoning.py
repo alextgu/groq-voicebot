@@ -4,129 +4,149 @@ from groq import Groq
 from dotenv import load_dotenv
 from app.services.knowledge import retrieve_context
 
-# Load environment variables
-load_dotenv()
+# 1. FIX THE WARNING LOGS
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Initialize Groq
+load_dotenv()
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+# DEBUG FLAG
+VERBOSE_DEBUG = True 
 
 class Reasoner:
     # ---------------------------------------------------------
-    # PART 1: THE PROMPT ENGINEER (Logic & Persona)
+    # PART 1: THE PERSONA
     # ---------------------------------------------------------
+    SYSTEM_DIRECTIVE = SYSTEM_DIRECTIVE = """
+    You are ZED. You are a Socratic "Gym Coach" for the mind.
     
-    # This is where you define Zed's personality
-    SYSTEM_DIRECTIVE = """
-    IDENTIFIED AS: ZED (Encouraging Socratic Tutor).
-    OBJECTIVE: Guide the student toward the answer using "Scaffolding." Build their confidence.
+    CORE BEHAVIORS:
+    1. THE GYM PHASE (User is confused/learning):
+       - ANSWER WITH QUESTIONS. If the user is struggling, scaffold the next step.
+       - NEVER explain the full answer. Make them work for it.
+       - "Slide 14 mentions X. How does that fit here?"
 
-    OPERATIONAL PROTOCOLS:
-    1. THE 80/20 RULE: The student must do 80 percent of the thinking. Never give the full answer. Provide a "bridge" (a hint or a leading question) that helps them take the next step.
-    
-    2. WARM & ACCESSIBLE: Use an encouraging, conversational tone. Use phrases like "Great start," "You're on the right track," or "Let's look at this together."
-    
-    3. HINT SEQUENCING: 
-       - Hint 1: Ask a question about a core concept.
-       - Hint 2: Provide a simplified analogy.
-       - Hint 3: Point to a specific section of the source material.
-    
-    4. SOURCE GROUNDING (RAG) & TRANSPARENCY: 
-       - SUCCESS: If the answer is in the provided slides/syllabus, explicitly cite it: "Looking at the course materials for [Week/Topic], they mention [Concept]. How does that relate to what you just said?"
-       - FAILURE: If the information is missing from the provided context, be honest but stay in character: "I've scanned our course materials for [Topic] and couldn't find a specific mention of that. Based on what we *do* know about the basics, what’s your best guess?"
-       - REDIRECTION: If they ask something completely out of scope, gently pull them back: "That’s an interesting path, but it's not in our syllabus. Let’s stick to [Current Topic]—what do you think about...?"
+    2. THE COOL-DOWN PHASE (User understands/agrees):
+       - DETECT CLOSURE. If the user says "Oh I get it", "Thanks", or "Makes sense", DO NOT ASK A QUESTION.
+       - VERIFY & DISMISS. Confirm their logic briefly, then end the turn.
+       - Example: "Exactly. You connect the variable to the constant. Good work." (Stop there).
 
-    5. CELEBRATE LOGIC: When the student makes progress, acknowledge the specific logic they used. "I like how you connected X to Y. What does that imply for Z?"
-    
-    6. CONCISE ENCOURAGEMENT: Keep spoken responses to 2-3 sentences. Stay warm but maintain the momentum of the lesson.
+    3. TONE:
+       - Brief, sharp, academic.
+       - No fluff ("I'm glad you asked").
+       - If they get it right, acknowledge it and shut up.
+
+    INTERACTION FLOW:
+    User: "Is it X?"
+    Zed: "Why would it be X?" (Gym Phase)
+    User: "Because Y?"
+    Zed: "Correct. Good." (Cool-down Phase - NO NEW QUESTION)
     """
 
     @staticmethod
-    def _construct_system_prompt(user_query: str) -> str:
+    def _construct_system_prompt(latest_query: str) -> str:
         """
-        Internal helper: Builds the prompt by fetching slides (RAG).
+        Builds the prompt using RAG based ONLY on the user's latest message.
         """
-        # 1. Search the Database (The Librarian)
-        # We ask for 3 chunks of context
-        results = retrieve_context(user_query, n_results=3)
+        results = retrieve_context(latest_query, n_results=3)
         
-        # 2. Check if we found anything good
-        # If the score is low (< 0.35), we assume the user is asking 
-        # something not in the slides (e.g., "What's the weather?")
+        # --- DEBUG PRINT ---
+        if VERBOSE_DEBUG:
+            print(f"\n[🔍 DEBUG] Analysis Query: '{latest_query}'")
+            if results and results[0]['score'] > 0.35:
+                print(f"[✅ DEBUG] Found relevant slide: {results[0]['source']} (Score: {results[0]['score']:.2f})")
+            else:
+                print(f"[❌ DEBUG] No relevant slides found.")
+        # -------------------
+
         is_relevant = results and results[0]['score'] > 0.35
-        
         context_block = ""
         
         if is_relevant:
-            # We found slides! Inject them.
             context_block = "\n=== RELEVANT COURSE MATERIAL ===\n"
             for r in results:
                 if r['score'] > 0.3:
-                    context_block += f"Source: {r['source']} (Page {r['page']})\n"
-                    context_block += f"Content: {r['text']}\n---\n"
-            context_block += "INSTRUCTION: Challenge the user based on the slides above."
-            
+                    context_block += f"Source: {r['source']}\nContent: {r['text']}\n---\n"
+            context_block += "INSTRUCTION: Challenge the user based on these slides."
         else:
-            # We found nothing. Tell Zed to admit it.
-            # Get list of loaded courses to be specific
-            download_dir = Path(__file__).parent.parent.parent / "data" / "downloads"
-            courses = [d.name for d in download_dir.iterdir()] if download_dir.exists() else []
-            course_list = ", ".join(courses[:3]) or "your database"
-            
-            context_block = (
-                f"\n=== SYSTEM NOTE ===\n"
-                f"You searched {course_list} and found NO MATCHES for this query.\n"
-                f"INSTRUCTION: Tell the user you didn't find that in the syllabus, "
-                f"then answer using general knowledge."
-            )
+            context_block = "\n=== SYSTEM NOTE ===\nNo specific course slides found for this topic. Rely on general knowledge."
 
-        # 3. Combine Persona + Context
         return f"{Reasoner.SYSTEM_DIRECTIVE}\n\n{context_block}"
 
     # ---------------------------------------------------------
-    # PART 2: THE ENGINE (Inference)
+    # PART 2: THE ENGINE (With Memory)
     # ---------------------------------------------------------
-
     @staticmethod
-    def generate_response(user_input: str):
+    def generate_response(conversation_history: list):
         """
-        The Main Public Function.
-        Takes text input -> Yields text tokens.
+        Takes a LIST of messages: 
+        [
+          {"role": "user", "content": "Hi"}, 
+          {"role": "assistant", "content": "Hello"}, 
+          {"role": "user", "content": "Help me"}
+        ]
         """
-        # A. Build the Prompt (Calls Part 1)
-        full_system_prompt = Reasoner._construct_system_prompt(user_input)
+        # 1. Get the very last thing the user said (for RAG search)
+        # We don't want to search the database for "Hello", only the real question.
+        latest_user_input = conversation_history[-1]['content']
+
+        # 2. Build the System Prompt (Persona + New Context)
+        system_prompt = Reasoner._construct_system_prompt(latest_user_input)
         
-        # B. Call Groq
+        # 3. Combine: [System Prompt] + [Conversation History]
+        # This gives Groq the "Personality" AND the "Memory"
+        messages_to_send = [
+            {"role": "system", "content": system_prompt}
+        ] + conversation_history
+        
         try:
             stream = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=[
-                    {"role": "system", "content": full_system_prompt},
-                    {"role": "user", "content": user_input}
-                ],
+                messages=messages_to_send,
                 temperature=0.6,
                 max_tokens=300,
                 stream=True
             )
-            
-            # C. Stream Response
             for chunk in stream:
                 content = chunk.choices[0].delta.content
                 if content:
                     yield content
                     
         except Exception as e:
-            yield f"[Zed Connection Error: {str(e)}]"
+            yield f"[Error: {str(e)}]"
 
 # ---------------------------------------------------------
-# PART 3: THE TESTER (Runs only in terminal)
+# PART 3: THE TERMINAL TESTER (Now with Memory Loop)
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    print("🤖 Zed Reasoning Engine (Terminal Mode)")
+    print("🤖 Zed Memory Test (Type 'reset' to clear memory)")
+    
+    # Initialize Memory
+    history = []
+    
     while True:
-        q = input("\nYou: ")
-        if q == "exit": break
+        user_text = input("\nYou: ")
+        
+        # RESET COMMAND
+        if user_text.lower() in ["reset", "clear"]:
+            history = []
+            print("🧹 Memory wiped.")
+            continue
+            
+        if user_text.lower() in ["exit", "quit"]:
+            break
+        
+        # 1. Add User to History
+        history.append({"role": "user", "content": user_text})
         
         print("Zed: ", end="")
-        for token in Reasoner.generate_response(q):
+        full_response = ""
+        
+        # 2. Call Generator with FULL History
+        for token in Reasoner.generate_response(history):
             print(token, end="", flush=True)
+            full_response += token
+            
+        # 3. Add Zed's Response to History (So he remembers what he said)
+        history.append({"role": "assistant", "content": full_response})
         print()
