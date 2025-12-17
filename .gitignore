@@ -35,3 +35,7 @@ npm-debug.log*
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Data (downloaded PDFs and vector DB)
+backend/data/downloads/
+backend/data/chroma_db/
