@@ -14,9 +14,7 @@ client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 VERBOSE_DEBUG = True 
 
 class Reasoner:
-    # ---------------------------------------------------------
     # PART 1: THE PERSONA
-    # ---------------------------------------------------------
     SYSTEM_DIRECTIVE = SYSTEM_DIRECTIVE = """
     You are ZED. You are a Socratic "Gym Coach" for the mind.
     
@@ -73,9 +71,7 @@ class Reasoner:
 
         return f"{Reasoner.SYSTEM_DIRECTIVE}\n\n{context_block}"
 
-    # ---------------------------------------------------------
     # PART 2: THE ENGINE (With Memory)
-    # ---------------------------------------------------------
     @staticmethod
     def generate_response(conversation_history: list):
         """
@@ -115,9 +111,7 @@ class Reasoner:
         except Exception as e:
             yield f"[Error: {str(e)}]"
 
-# ---------------------------------------------------------
 # PART 3: THE TERMINAL TESTER (Now with Memory Loop)
-# ---------------------------------------------------------
 if __name__ == "__main__":
     print("🤖 Zed Memory Test (Type 'reset' to clear memory)")
     
