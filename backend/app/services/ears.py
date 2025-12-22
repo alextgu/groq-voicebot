@@ -16,7 +16,7 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
 SILENCE_THRESHOLD = 500
-SILENCE_DURATION = 2.0  # Float is fine here
+SILENCE_DURATION = 1.0  
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
