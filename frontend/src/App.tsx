@@ -226,11 +226,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Status */}
-            <div className="flex items-center gap-2 text-gray-500 text-[10px] sm:text-xs">
-              <div className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-green-500 animate-pulse"></div>
-              <span>Connected</span>
-            </div>
           </div>
         </motion.div>
       )}
@@ -288,36 +283,30 @@ export default function App() {
                 {/* Content */}
                 <div className="space-y-3 sm:space-y-4 text-xs sm:text-sm leading-relaxed">
                   <p className="text-gray-300">
-                    <span className="text-[#ff6b6b] font-semibold">AI is killing critical thinking.</span>{" "}
-                    Studies show a significant decline in student performance and independent problem-solving 
-                    as AI tools become more prevalent in education.
-                  </p>
-                  
-                  <p className="text-gray-400 hidden sm:block">
-                    Universities worldwide are reporting decreased marks and a growing inability 
-                    among students to think through problems without AI assistance.
+                    <span className="text-[#ff6b6b] font-semibold">AI is eroding critical thinking.</span>{" "}
+                    Students are losing the ability to solve problems independently.
                   </p>
 
                   <div className="h-px bg-white/10"></div>
                   
                   <p className="text-gray-300">
                     <span className="text-[#ff6b6b] font-semibold">ZED is different.</span>{" "}
-                    Instead of giving you answers, ZED promotes{" "}
-                    <span className="text-white font-medium">critical thinking</span> by:
+                    Instead of answers, ZED gives you{" "}
+                    <span className="text-white font-medium">questions</span>—guiding you to think, not memorize and basing it entirely off your personalized courses through <span className="text-white font-medium">Canvas</span>.
                   </p>
 
-                  <ul className="space-y-1.5 sm:space-y-2 text-gray-400">
+                  <ul className="space-y-1.5 text-gray-400">
                     <li className="flex items-start gap-2">
-                      <span className="text-[#ff6b6b] mt-0.5">→</span>
-                      <span>Quizzing you on your actual course material</span>
+                      <span className="text-[#ff6b6b]">→</span>
+                      <span>Quizzes you on your course material</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-[#ff6b6b] mt-0.5">→</span>
-                      <span>Guiding you to answers, not handing them over</span>
+                      <span className="text-[#ff6b6b]">→</span>
+                      <span>Guides, never spoon-feeds</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-[#ff6b6b] mt-0.5">→</span>
-                      <span>Building real understanding that sticks</span>
+                      <span className="text-[#ff6b6b]">→</span>
+                      <span>Builds real understanding</span>
                     </li>
                   </ul>
                 </div>
@@ -325,13 +314,13 @@ export default function App() {
                 {/* Footer */}
                 <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-white/10">
                   <p className="text-gray-500 text-[10px] sm:text-xs text-center">
-                    Built for students who want to actually learn.
-                  </p>
-                </div>
+                    Built to maintain Human Agency and Critical Thinking.
+        </p>  
+      </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </>
+    </>
       )}
       </AnimatePresence>
     </div>

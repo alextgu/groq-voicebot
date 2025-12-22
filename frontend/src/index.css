@@ -45,10 +45,10 @@
   }
   50% {
     transform: translate(-3%, 5%) rotate(-3deg) scale(0.98);
-  }
+}
   75% {
     transform: translate(-5%, -3%) rotate(3deg) scale(1.02);
-  }
+}
 }
 
 /* Additional floating orbs for more depth */
@@ -91,7 +91,7 @@
 @keyframes orbFloat {
   0%, 100% {
     transform: translate(0, 0) scale(1);
-  }
+}
   20% {
     transform: translate(80px, -60px) scale(1.1);
   }
@@ -103,7 +103,7 @@
   }
   80% {
     transform: translate(-60px, -40px) scale(0.95);
-  }
+}
 }
 
 /* Gradient text animation */
@@ -149,11 +149,11 @@
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
-}
+  }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
-}
+  }
 
 /* Base styles */
 body {
