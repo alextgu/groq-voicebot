@@ -39,3 +39,7 @@ htmlcov/
 # Data (downloaded PDFs and vector DB)
 backend/data/downloads/
 backend/data/chroma_db/
+
+# Wake word models (licensed - don't commit)
+backend/data/wake_words/
+*.ppn
