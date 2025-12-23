@@ -16,6 +16,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 
 export type VoiceMode = "push-to-talk" | "hands-free";
 export type VoiceStatus = "idle" | "listening" | "recording" | "processing" | "speaking" | "error";
+export type ConversationState = "waiting" | "active"; // waiting for wake word, or in active conversation
 
 export interface VoiceInputConfig {
   /** WebSocket URL for the server */
@@ -40,6 +41,7 @@ export interface ChatMessage {
 export interface VoiceInputState {
   status: VoiceStatus;
   mode: VoiceMode;
+  conversationState: ConversationState; // waiting for wake word or in active conversation
   isConnected: boolean;
   transcription: string;
   response: string;
@@ -77,6 +79,31 @@ const DEFAULT_CONFIG: Required<VoiceInputConfig> = {
   sampleRate: 16000,
 };
 
+// Wake word and end phrase detection
+const WAKE_PHRASES = ["hey zed", "hey said", "hey set", "hey zedd", "hey zet", "a zed", "heyze"];
+const END_PHRASES = ["thank you zed", "thanks zed", "thank you said", "thanks said", "thankyou zed"];
+
+function containsWakeWord(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  return WAKE_PHRASES.some(phrase => lower.includes(phrase));
+}
+
+function containsEndPhrase(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  return END_PHRASES.some(phrase => lower.includes(phrase));
+}
+
+function extractAfterWakeWord(text: string): string {
+  const lower = text.toLowerCase();
+  for (const phrase of WAKE_PHRASES) {
+    const idx = lower.indexOf(phrase);
+    if (idx !== -1) {
+      return text.slice(idx + phrase.length).trim();
+    }
+  }
+  return text;
+}
+
 // ============================================================
 // HOOK
 // ============================================================
@@ -84,20 +111,7 @@ const DEFAULT_CONFIG: Required<VoiceInputConfig> = {
 export function useVoiceInput(config: VoiceInputConfig = {}): [VoiceInputState, VoiceInputActions] {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   
-  // State - Default to hands-free mode
-  const [status, setStatus] = useState<VoiceStatus>("idle");
-  const [mode, setModeState] = useState<VoiceMode>("hands-free");
-  const [isConnected, setIsConnected] = useState(false);
-  const [transcription, setTranscription] = useState("");
-  const [response, setResponse] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [volume, setVolume] = useState(0);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  
-  // Ref to track current response being built
-  const currentResponseRef = useRef("");
-  
-  // Refs
+  // Refs (declared first since setStatus uses statusRef)
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -105,6 +119,7 @@ export function useVoiceInput(config: VoiceInputConfig = {}): [VoiceInputState, 
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const volumeIntervalRef = useRef<number | null>(null);
+  const currentResponseRef = useRef("");
   
   // VAD state refs
   const isSpeakingRef = useRef(false);
@@ -112,6 +127,28 @@ export function useVoiceInput(config: VoiceInputConfig = {}): [VoiceInputState, 
   const speechStartRef = useRef<number | null>(null);
   const vadEnabledRef = useRef(false);
   const isRecordingRef = useRef(false);
+  const statusRef = useRef<VoiceStatus>("idle"); // Track status for VAD logic
+  const cooldownUntilRef = useRef<number>(0); // Prevent recording right after ZED speaks
+  
+  // State - Default to hands-free mode
+  const [status, setStatusState] = useState<VoiceStatus>("idle");
+  const [mode, setModeState] = useState<VoiceMode>("hands-free");
+  const [conversationState, setConversationState] = useState<ConversationState>("waiting");
+  const [isConnected, setIsConnected] = useState(false);
+  const [transcription, setTranscription] = useState("");
+  const [response, setResponse] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [volume, setVolume] = useState(0);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  
+  // Ref for conversation state (for use in callbacks)
+  const conversationStateRef = useRef<ConversationState>("waiting");
+  
+  // Wrapper to keep statusRef in sync with state
+  const setStatus = useCallback((newStatus: VoiceStatus) => {
+    statusRef.current = newStatus;
+    setStatusState(newStatus);
+  }, []);
   
   // ─────────────────────────────────────────────────────
   // WEBSOCKET CONNECTION
@@ -146,29 +183,123 @@ export function useVoiceInput(config: VoiceInputConfig = {}): [VoiceInputState, 
       setIsConnected(false);
     };
     
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
+      // Check if it's binary data (audio)
+      if (event.data instanceof Blob) {
+        console.log("🔊 Received audio:", event.data.size, "bytes");
+        try {
+          // Play the audio
+          const audioUrl = URL.createObjectURL(event.data);
+          const audio = new Audio(audioUrl);
+          
+          // Set status to speaking while audio plays
+          setStatus("speaking");
+          
+          audio.onended = () => {
+            console.log("🔊 Audio playback finished");
+            URL.revokeObjectURL(audioUrl);
+            
+            // Set cooldown after audio finishes
+            cooldownUntilRef.current = Date.now() + 2000;
+            console.log("⏸️ Cooldown started (2s before listening again)");
+            setStatus("idle");
+          };
+          
+          audio.onerror = (e) => {
+            console.error("Audio playback error:", e);
+            URL.revokeObjectURL(audioUrl);
+            setStatus("idle");
+          };
+          
+          await audio.play();
+        } catch (e) {
+          console.error("Failed to play audio:", e);
+          setStatus("idle");
+        }
+        return;
+      }
+      
+      // Handle JSON messages
       try {
         const data = JSON.parse(event.data);
         console.log("📨 Received:", data.type);
         
         switch (data.type) {
-          case "transcription":
-            setTranscription(data.text);
+          case "transcription": {
+            const text = data.text;
+            console.log("🎤 Transcription:", text, "| State:", conversationStateRef.current);
+            
+            // Check for end phrase first (takes priority)
+            if (containsEndPhrase(text)) {
+              console.log("👋 End phrase detected - ending conversation");
+              setConversationState("waiting");
+              conversationStateRef.current = "waiting";
+              setTranscription("");
+              setResponse("Goodbye! Say 'Hey ZED' when you need me.");
+              
+              // Send end signal to server
+              if (wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({ type: "end_conversation" }));
+              }
+              
+              setStatus("idle");
+              return;
+            }
+            
+            // Check for wake word
+            if (conversationStateRef.current === "waiting") {
+              if (containsWakeWord(text)) {
+                console.log("👂 Wake word detected - activating!");
+                setConversationState("active");
+                conversationStateRef.current = "active";
+                
+                // Extract anything said after the wake word
+                const afterWake = extractAfterWakeWord(text);
+                if (afterWake && afterWake.length > 2) {
+                  // User said something after "Hey ZED", process it
+                  setTranscription(afterWake);
+                  setStatus("processing");
+                  setChatHistory(prev => [...prev, {
+                    id: `user-${Date.now()}`,
+                    role: "user",
+                    content: afterWake,
+                    timestamp: new Date()
+                  }]);
+                  currentResponseRef.current = "";
+                  
+                  // Send the actual query to backend
+                  if (wsRef.current?.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify({ type: "text", text: afterWake }));
+                  }
+                } else {
+                  // Just wake word, acknowledge and wait for question
+                  setTranscription("");
+                  setResponse("I'm listening...");
+                  setStatus("idle");
+                }
+              } else {
+                // Not a wake word, ignore
+                console.log("💤 Ignoring (waiting for wake word):", text);
+                setStatus("idle");
+              }
+              return;
+            }
+            
+            // Active conversation - process normally
+            setTranscription(text);
             setStatus("processing");
-            // Add user message to history
             setChatHistory(prev => [...prev, {
               id: `user-${Date.now()}`,
               role: "user",
-              content: data.text,
+              content: text,
               timestamp: new Date()
             }]);
-            // Reset response accumulator
             currentResponseRef.current = "";
             break;
+          }
           
           case "response":
             if (data.done) {
-              setStatus("idle");
               const finalText = data.full_text || currentResponseRef.current;
               if (finalText) {
                 setResponse(finalText);
@@ -181,6 +312,14 @@ export function useVoiceInput(config: VoiceInputConfig = {}): [VoiceInputState, 
                 }]);
               }
               currentResponseRef.current = "";
+              
+              // If no audio coming, set idle immediately with cooldown
+              if (!data.has_audio) {
+                cooldownUntilRef.current = Date.now() + 2000;
+                console.log("⏸️ Cooldown started (no audio, 2s before listening)");
+                setStatus("idle");
+              }
+              // If audio is coming, keep status as "speaking" until audio finishes
             } else {
               currentResponseRef.current += data.text;
               setResponse(currentResponseRef.current);
@@ -213,6 +352,29 @@ export function useVoiceInput(config: VoiceInputConfig = {}): [VoiceInputState, 
       wsRef.current?.close();
     };
   }, [connectWebSocket]);
+  
+  // Initialize hands-free mode on mount (request mic permission and start VAD)
+  useEffect(() => {
+    const initHandsFree = async () => {
+      if (mode === "hands-free") {
+        console.log("🎤 Initializing hands-free mode on mount...");
+        try {
+          await setupAudio();
+          vadEnabledRef.current = true;
+          startVolumeMonitoring();
+          setStatus("listening");
+          console.log("✅ Hands-free mode active");
+        } catch (e) {
+          console.error("Failed to initialize hands-free mode:", e);
+          setError("Microphone access required");
+        }
+      }
+    };
+    
+    // Small delay to let WebSocket connect first
+    const timer = setTimeout(initHandsFree, 500);
+    return () => clearTimeout(timer);
+  }, []); // Only run once on mount
   
   // ─────────────────────────────────────────────────────
   // AUDIO SETUP
@@ -280,10 +442,18 @@ export function useVoiceInput(config: VoiceInputConfig = {}): [VoiceInputState, 
       const vol = getVolume();
       setVolume(vol);
       
-      // VAD Logic (only in hands-free mode)
-      if (vadEnabledRef.current && !isRecordingRef.current) {
-        const now = Date.now();
-        
+      // VAD Logic (only in hands-free mode, and NOT while processing/speaking/cooldown)
+      const currentStatus = statusRef.current;
+      const now = Date.now();
+      const inCooldown = now < cooldownUntilRef.current;
+      
+      const canListen = vadEnabledRef.current && 
+                        !isRecordingRef.current && 
+                        !inCooldown &&
+                        currentStatus !== "processing" && 
+                        currentStatus !== "speaking";
+      
+      if (canListen) {
         if (vol > cfg.vadThreshold) {
           // Sound detected
           silenceStartRef.current = null;
@@ -514,6 +684,7 @@ export function useVoiceInput(config: VoiceInputConfig = {}): [VoiceInputState, 
   const state: VoiceInputState = {
     status,
     mode,
+    conversationState,
     isConnected,
     transcription,
     response,

@@ -19,8 +19,6 @@ const TAGLINES = [
 ];
 
 export default function MainScene({ rotation, onMouseMove, onMouseLeave }: MainSceneProps) {
-  const [showInput, setShowInput] = useState(false);
-  const [query, setQuery] = useState("");
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [taglineIndex, setTaglineIndex] = useState(0);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -32,8 +30,8 @@ export default function MainScene({ rotation, onMouseMove, onMouseLeave }: MainS
     silenceDuration: 1500,
   });
   
-  const { status, isConnected, response, error, volume, chatHistory } = voiceState;
-  const { sendText, clear } = voiceActions;
+  const { status, conversationState, isConnected, response, error, volume, chatHistory } = voiceState;
+  const { clear } = voiceActions;
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -47,14 +45,6 @@ export default function MainScene({ rotation, onMouseMove, onMouseLeave }: MainS
     }, 5000);
     return () => clearInterval(interval);
   }, []);
-
-  // Handle text form submission
-  const handleTextSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    sendText(query);
-    setQuery("");
-  };
 
   const hasMessages = chatHistory.length > 0;
 
@@ -299,7 +289,16 @@ export default function MainScene({ rotation, onMouseMove, onMouseLeave }: MainS
           </div>
 
           {/* Voice Status - Primary Focus */}
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-6">
+            {/* Conversation State Indicator */}
+            <div className={`text-sm font-medium px-4 py-2 rounded-full ${
+              conversationState === "active" 
+                ? "bg-green-500/20 text-green-300 border border-green-500/30" 
+                : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+            }`}>
+              {conversationState === "active" ? "🟢 Conversation Active" : "💤 Say \"Hey ZED\" to start"}
+            </div>
+
             {/* Main Voice Indicator */}
             <motion.div 
               className={`relative px-8 sm:px-12 py-4 sm:py-5 rounded-2xl text-base sm:text-lg font-medium border-2 backdrop-blur-md transition-all ${
@@ -311,6 +310,8 @@ export default function MainScene({ rotation, onMouseMove, onMouseLeave }: MainS
                   ? "bg-yellow-500/20 border-yellow-500/40 text-yellow-200"
                   : status === "speaking"
                   ? "bg-[#ff6b6b]/20 border-[#ff6b6b]/40 text-[#ff6b6b]"
+                  : conversationState === "active"
+                  ? "bg-green-500/10 border-green-500/30 text-green-300"
                   : "bg-white/5 border-white/20 text-gray-300"
               }`}
               animate={status === "recording" ? { scale: [1, 1.02, 1] } : {}}
@@ -348,10 +349,16 @@ export default function MainScene({ rotation, onMouseMove, onMouseLeave }: MainS
                     🔊 Speaking...
                   </>
                 )}
-                {status === "idle" && (
+                {status === "idle" && conversationState === "active" && (
+                  <>
+                    <span className="w-3 h-3 rounded-full bg-green-400 animate-pulse"></span>
+                    🎤 Listening...
+                  </>
+                )}
+                {status === "idle" && conversationState === "waiting" && (
                   <>
                     <span className="w-3 h-3 rounded-full bg-gray-400"></span>
-                    🎤 Speak anytime
+                    Waiting for "Hey ZED"
                   </>
                 )}
                 {status === "error" && (
@@ -363,42 +370,15 @@ export default function MainScene({ rotation, onMouseMove, onMouseLeave }: MainS
               </span>
             </motion.div>
 
-            {/* Secondary: Type option */}
-            <button
-              onClick={() => setShowInput(!showInput)}
-              className="text-gray-500 text-sm hover:text-gray-300 transition-colors flex items-center gap-2"
-            >
-              <span>⌨️</span>
-              <span>{showInput ? "Hide keyboard" : "Or type instead"}</span>
-            </button>
-
-            {/* Text Input Form */}
-            <AnimatePresence>
-              {showInput && (
-                <motion.form
-                  initial={{ opacity: 0, y: -10, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: "auto" }}
-                  exit={{ opacity: 0, y: -10, height: 0 }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
-                  onSubmit={handleTextSubmit}
-                  className="flex items-center justify-center gap-2 sm:gap-3 w-full"
-                >
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Ask ZED anything..."
-                    className="flex-1 sm:flex-none w-full sm:w-72 md:w-96 px-4 sm:px-5 py-2.5 sm:py-3 bg-white/10 border border-white/20 rounded-xl text-white text-sm sm:text-base placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500/50 backdrop-blur-lg transition"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-[#ff6b6b] to-[#ff9a9e] rounded-xl font-semibold text-white hover:scale-105 active:scale-95 transition-transform"
-                  >
-                    →
-                  </button>
-                </motion.form>
-              )}
-            </AnimatePresence>
+            {/* Instructions */}
+            <div className="text-center space-y-2 text-sm text-gray-400">
+              <p>
+                <span className="text-[#ff6b6b] font-semibold">"Hey ZED"</span> → Start conversation
+              </p>
+              <p>
+                <span className="text-[#ff6b6b] font-semibold">"Thank you ZED"</span> → End conversation
+              </p>
+            </div>
           </div>
 
           {/* Error Display - Small and subtle */}

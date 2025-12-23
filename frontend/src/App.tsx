@@ -207,22 +207,22 @@ export default function App() {
             {/* Instructions */}
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm">
               <div className="flex items-center gap-2 text-gray-400">
-                <span className="px-2 py-1 bg-white/10 rounded text-[10px] sm:text-xs font-mono text-[#ff6b6b]">
+                <span className="px-2 py-1 bg-green-500/20 border border-green-500/30 rounded text-[10px] sm:text-xs font-mono text-green-400">
                   "Hey ZED"
                 </span>
-                <span>Wake word</span>
+                <span>Start</span>
               </div>
               <div className="flex items-center gap-2 text-gray-400">
                 <span className="px-2 py-1 bg-white/10 rounded text-[10px] sm:text-xs font-mono">
-                  🎤 Click
+                  🎤 Speak
                 </span>
-                <span>Voice</span>
+                <span>Your question</span>
               </div>
               <div className="flex items-center gap-2 text-gray-400">
-                <span className="px-2 py-1 bg-white/10 rounded text-[10px] sm:text-xs font-mono">
-                  ⌨️ Type
+                <span className="px-2 py-1 bg-[#ff6b6b]/20 border border-[#ff6b6b]/30 rounded text-[10px] sm:text-xs font-mono text-[#ff6b6b]">
+                  "Thank you ZED"
                 </span>
-                <span>Question</span>
+                <span>End</span>
               </div>
             </div>
 
